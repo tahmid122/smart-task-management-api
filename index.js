@@ -324,7 +324,6 @@ async function run() {
         });
       }
     });
-
     // add task
     app.post("/add-task", verifyToken, async (req, res) => {
       const task = req.body;
@@ -348,6 +347,65 @@ async function run() {
             success: false,
             message: "Failed to add",
             data: newTask,
+          });
+        }
+      } catch (error) {
+        res.send({
+          success: false,
+          message: "Something went wrong",
+          error: error.message,
+        });
+      }
+    });
+
+    // get all tasks
+    app.get("/tasks/:email", verifyToken, async (req, res) => {
+      try {
+        const { email } = req.params;
+        const projects = await projectsCollection
+          .find({ createdBy: email }, { projection: { _id: 0, name: 1 } })
+          .toArray();
+        const projectsArr = projects.map((project) => project.name);
+        console.log(projectsArr);
+        const allTasks = await tasksCollection
+          .find({ project: { $in: projectsArr } })
+          .toArray();
+        if (allTasks && allTasks.length > 0) {
+          res.send({
+            success: true,
+            message: "Fetching successful",
+            data: allTasks,
+          });
+        } else {
+          res.send({ success: false, message: "0 task found", data: [] });
+        }
+      } catch (error) {
+        res.send({
+          success: false,
+          message: "Something went wrong",
+          error: error.message,
+        });
+      }
+    });
+
+    // delete a task
+    app.delete("/delete-task/:deleteId", verifyToken, async (req, res) => {
+      const { deleteId } = req.params;
+      try {
+        const deleteTask = await tasksCollection.deleteOne({
+          _id: new ObjectId(deleteId),
+        });
+        if (deleteTask.deletedCount > 0) {
+          res.send({
+            success: true,
+            message: "Deleted successfully",
+            data: deleteTask,
+          });
+        } else {
+          res.send({
+            success: false,
+            message: "Failed to delete",
+            data: deleteTask,
           });
         }
       } catch (error) {
