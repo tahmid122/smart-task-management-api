@@ -42,6 +42,28 @@ async function run() {
         }
       });
     };
+    // user verification
+    app.get("/get-user", verifyToken, async (req, res) => {
+      const email = req.email;
+      try {
+        const user = await usersCollection.findOne({ email });
+        if (user) {
+          res.send({
+            success: true,
+            message: "User found",
+            data: { fullName: user.fullName, email: user.email },
+          });
+        } else {
+          res.status(401).send("Unauthorized access");
+        }
+      } catch (error) {
+        res.send({
+          success: false,
+          message: "Something went wrong",
+          error: error.message,
+        });
+      }
+    });
     // Signup user
     app.post("/sign-up", async (req, res) => {
       const newUser = req.body;
@@ -109,7 +131,12 @@ async function run() {
             }
           );
           //   res.cookie("token", token, { httpOnly: true });
-          res.send({ success: true, message: "Login successful", token });
+          res.send({
+            success: true,
+            message: "Login successful",
+            token,
+            data: user,
+          });
         });
       } catch (error) {
         res.send({
