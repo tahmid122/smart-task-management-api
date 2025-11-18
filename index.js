@@ -523,6 +523,35 @@ async function run() {
         });
       }
     });
+    // total projects and tasks
+    app.get("/total/:email", verifyToken, async (req, res) => {
+      try {
+        const { email } = req.params;
+        const projects = await projectsCollection
+          .find({ createdBy: email }, { projection: { _id: 0, name: 1 } })
+          .toArray();
+        const projectsFinal = projects.map((project) => project.name);
+        const projectLength = projectsFinal.length;
+        let taskLength = 0;
+        for (const final of projectsFinal) {
+          const tasks = await tasksCollection
+            .find({ project: final })
+            .toArray();
+          taskLength += tasks.length;
+        }
+        res.send({
+          success: true,
+          message: "Fetching successful",
+          data: { projectLength, taskLength },
+        });
+      } catch (error) {
+        res.send({
+          success: false,
+          message: "Something went wrong",
+          error: error.message,
+        });
+      }
+    });
   } finally {
     // Ensures that the client will close when you finish/error
     // await client.close();
