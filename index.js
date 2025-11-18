@@ -6,7 +6,7 @@ const cors = require("cors");
 const bcrypt = require("bcrypt");
 const saltRounds = 10;
 let jwt = require("jsonwebtoken");
-const { MongoClient, ServerApiVersion } = require("mongodb");
+const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const mongoUri = process.env.MONGO_URI;
 // middlewares
 app.use(cors({ origin: ["http://localhost:5173"], credentials: true }));
@@ -26,6 +26,7 @@ async function run() {
     const usersCollection = db.collection("users");
     const teamsCollection = db.collection("teams");
     const projectsCollection = db.collection("projects");
+    const tasksCollection = db.collection("tasks");
     const activitiesCollection = db.collection("activities");
     // middlewares
     const verifyToken = (req, res, next) => {
@@ -148,8 +149,214 @@ async function run() {
     });
     // create team
     app.post("/create-team", verifyToken, async (req, res) => {
-      console.log(req.email);
-      res.send(req.body);
+      const { teamName, createdBy } = req.body;
+      const createdAt = new Date().toISOString();
+      try {
+        const newTeam = await teamsCollection.insertOne({
+          teamName,
+          createdBy,
+          members: [],
+          createdAt,
+        });
+        if (newTeam.insertedId) {
+          res.send({ success: true, message: "Team created", data: newTeam });
+        } else {
+          res.send({
+            success: false,
+            message: "Failed to create",
+            data: newTeam,
+          });
+        }
+      } catch (error) {
+        res.send({
+          success: false,
+          message: "Something went wrong",
+          error: error.message,
+        });
+      }
+    });
+    // get all teams
+    app.get("/teams/:email", verifyToken, async (req, res) => {
+      const { email } = req.params;
+      try {
+        const teams = await teamsCollection
+          .find({ createdBy: email })
+          .toArray();
+        if (teams && teams.length > 0) {
+          res.send({
+            success: true,
+            message: "Fetching successful",
+            data: teams,
+          });
+        } else {
+          res.send({ success: false, message: "No team found", data: [] });
+        }
+      } catch (error) {
+        res.send({
+          success: false,
+          message: "Something went wrong",
+          error: error.message,
+        });
+      }
+    });
+    // add member to team
+    app.post("/add-member", verifyToken, async (req, res) => {
+      const { memberTeam: teamId } = req.body;
+      const member = req.body;
+      try {
+        const addMember = await teamsCollection.updateOne(
+          { _id: new ObjectId(teamId) },
+          {
+            $push: {
+              members: {
+                name: member.memberName,
+                role: member.memberRole,
+                capacity: parseInt(member.memberCapacity),
+              },
+            },
+          }
+        );
+        if (addMember.modifiedCount) {
+          res.send({
+            success: true,
+            message: "Member successfully added",
+            data: addMember,
+          });
+        } else {
+          res.send({
+            success: false,
+            message: "Failed to add member",
+            data: addMember,
+          });
+        }
+      } catch (error) {
+        res.send({
+          success: false,
+          message: "Something went wrong",
+          error: error.message,
+        });
+      }
+    });
+    // create projects
+    app.post("/create-project", verifyToken, async (req, res) => {
+      const project = req.body;
+      project.createdAt = new Date().toISOString();
+      try {
+        const createNewProject = await projectsCollection.insertOne(project);
+        if (createNewProject.insertedId) {
+          res.send({
+            success: true,
+            message: "Project created successfully",
+            data: createNewProject,
+          });
+        } else {
+          res.send({
+            success: false,
+            message: "Failed to create project",
+            data: createNewProject,
+          });
+        }
+      } catch (error) {
+        res.send({
+          success: false,
+          message: "Something went wrong",
+          error: error.message,
+        });
+      }
+    });
+    // get all projects
+    app.get("/projects/:email", verifyToken, async (req, res) => {
+      const { email } = req.params;
+      try {
+        const projects = await projectsCollection
+          .find({ createdBy: email })
+          .toArray();
+        if (projects && projects.length > 0) {
+          res.send({
+            success: true,
+            message: "Fetching successful",
+            data: projects,
+          });
+        } else {
+          res.send({
+            success: false,
+            message: "0 project found",
+            data: [],
+          });
+        }
+      } catch (error) {
+        res.send({
+          success: false,
+          message: "Something went wrong",
+          error: error.message,
+        });
+      }
+    });
+    // get members by team
+    app.get("/members/:team", verifyToken, async (req, res) => {
+      const { team } = req.params;
+      try {
+        const members = await teamsCollection.findOne(
+          { teamName: team },
+          { projection: { _id: 0, members: 1 } }
+        );
+        const arr = members.members;
+        // console.log(arr);
+        for (const member of arr) {
+          const assignTasks = await tasksCollection
+            .find({ assignMember: member.name, status: { $ne: "done" } })
+            .toArray();
+          const length = await assignTasks.length;
+          member.currentTask = length;
+        }
+        if (members) {
+          res.send({
+            success: true,
+            message: "Fetching successful",
+            data: arr,
+          });
+        }
+      } catch (error) {
+        res.send({
+          success: false,
+          message: "Something went wrong",
+          error: error.message,
+        });
+      }
+    });
+
+    // add task
+    app.post("/add-task", verifyToken, async (req, res) => {
+      const task = req.body;
+      try {
+        const newTask = await tasksCollection.insertOne({
+          project: task.project,
+          title: task.taskTitle,
+          description: task.taskDescription,
+          assignMember: task.assignMember,
+          priority: task.taskPriority,
+          status: "pending",
+        });
+        if (newTask.insertedId) {
+          res.send({
+            success: true,
+            message: "Task added successfully",
+            data: newTask,
+          });
+        } else {
+          res.send({
+            success: false,
+            message: "Failed to add",
+            data: newTask,
+          });
+        }
+      } catch (error) {
+        res.send({
+          success: false,
+          message: "Something went wrong",
+          error: error.message,
+        });
+      }
     });
   } finally {
     // Ensures that the client will close when you finish/error
