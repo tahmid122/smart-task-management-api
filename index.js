@@ -27,7 +27,21 @@ async function run() {
     const teamsCollection = db.collection("teams");
     const projectsCollection = db.collection("projects");
     const activitiesCollection = db.collection("activities");
-
+    // middlewares
+    const verifyToken = (req, res, next) => {
+      const header = req?.headers?.authorization;
+      if (!header || !header.startsWith("Bearer"))
+        return res.status(401).send("Unauthorized access");
+      const token = header.split(" ")[1];
+      if (!token) return res.status(401).send("Unauthorized access");
+      jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
+        if (err) return res.status(401).send("Unauthorized access");
+        if (decoded && decoded.email) {
+          req.email = decoded.email;
+          next();
+        }
+      });
+    };
     // Signup user
     app.post("/sign-up", async (req, res) => {
       const newUser = req.body;
@@ -104,6 +118,11 @@ async function run() {
           error: error.message,
         });
       }
+    });
+    // create team
+    app.post("/create-team", verifyToken, async (req, res) => {
+      console.log(req.email);
+      res.send(req.body);
     });
   } finally {
     // Ensures that the client will close when you finish/error
