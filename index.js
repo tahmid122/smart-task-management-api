@@ -366,7 +366,6 @@ async function run() {
           .find({ createdBy: email }, { projection: { _id: 0, name: 1 } })
           .toArray();
         const projectsArr = projects.map((project) => project.name);
-        console.log(projectsArr);
         const allTasks = await tasksCollection
           .find({ project: { $in: projectsArr } })
           .toArray();
@@ -427,6 +426,39 @@ async function run() {
         if (updateTask.modifiedCount > 0) {
           res.send({
             success: true,
+            message: "Task status successfully updated",
+            data: updateTask,
+          });
+        } else {
+          res.send({
+            success: false,
+            message: "Failed to update",
+            data: updateTask,
+          });
+        }
+      } catch (error) {
+        res.send({
+          success: false,
+          message: "Something went wrong",
+          error: error.message,
+        });
+      }
+    });
+    // update task
+    app.put("/update-task", verifyToken, async (req, res) => {
+      const task = req.body;
+      const query = { _id: new ObjectId(task?.taskId) };
+      try {
+        const updateTask = await tasksCollection.updateOne(query, {
+          $set: {
+            title: task.taskTitle,
+            description: task.taskDescription,
+            priority: task.taskPriority,
+          },
+        });
+        if (updateTask.modifiedCount > 0) {
+          res.send({
+            success: true,
             message: "Task successfully updated",
             data: updateTask,
           });
@@ -435,6 +467,52 @@ async function run() {
             success: false,
             message: "Failed to update",
             data: updateTask,
+          });
+        }
+      } catch (error) {
+        res.send({
+          success: false,
+          message: "Something went wrong",
+          error: error.message,
+        });
+      }
+    });
+
+    //team summary
+    app.get("/team-summary", verifyToken, async (req, res) => {
+      try {
+        const members = await teamsCollection
+          .find({}, { projection: { _id: 0, members: 1 } })
+          .toArray();
+        const arr = members.map((member) => member.members);
+        const flatArr = arr.flat();
+        // task length
+        for (const ar of flatArr) {
+          const name = ar.name;
+          const tasks = await tasksCollection
+            .find({
+              assignMember: name,
+            })
+            .toArray();
+          const currentTask = tasks.length;
+          ar.currentTask = currentTask;
+          const teams = await teamsCollection.findOne(
+            { "members.name": name },
+            { projection: { _id: 0, teamName: 1 } }
+          );
+          ar.teamName = teams.teamName;
+        }
+        if (flatArr && flatArr.length > 0) {
+          res.send({
+            success: true,
+            message: "Fetching successful",
+            data: flatArr,
+          });
+        } else {
+          res.send({
+            success: false,
+            message: "0 data found",
+            data: [],
           });
         }
       } catch (error) {
