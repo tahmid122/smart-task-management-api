@@ -416,6 +416,35 @@ async function run() {
         });
       }
     });
+    // change status
+    app.patch("/update-task-status", verifyToken, async (req, res) => {
+      try {
+        const { id, status } = req.body;
+        const updateTask = await tasksCollection.updateOne(
+          { _id: new ObjectId(id) },
+          { $set: { status: status } }
+        );
+        if (updateTask.modifiedCount > 0) {
+          res.send({
+            success: true,
+            message: "Task successfully updated",
+            data: updateTask,
+          });
+        } else {
+          res.send({
+            success: false,
+            message: "Failed to update",
+            data: updateTask,
+          });
+        }
+      } catch (error) {
+        res.send({
+          success: false,
+          message: "Something went wrong",
+          error: error.message,
+        });
+      }
+    });
   } finally {
     // Ensures that the client will close when you finish/error
     // await client.close();
