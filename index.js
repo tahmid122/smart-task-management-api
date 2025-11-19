@@ -9,7 +9,15 @@ let jwt = require("jsonwebtoken");
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const mongoUri = process.env.MONGO_URI;
 // middlewares
-app.use(cors({ origin: ["http://localhost:5173"], credentials: true }));
+app.use(
+  cors({
+    origin: [
+      "http://localhost:5173",
+      "https://smart-task-management-tau.vercel.app",
+    ],
+    credentials: true,
+  })
+);
 app.use(express.json());
 // mongodb
 const client = new MongoClient(`${mongoUri}`, {
